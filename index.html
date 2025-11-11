@@ -1,0 +1,46 @@
+<!doctype html><meta charset="utf-8">
+<title>EC Filtration</title>
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<div id="graph" style="width:49%;height:600px;display:inline-block"></div>
+<div id="ec"    style="width:49%;height:600px;display:inline-block"></div>
+<script>
+fetch("ec_payload.json").then(r=>r.json()).then(D=>{
+  const T = D.thresholds, EC = D.ec, Gs = D.graphs;
+
+  // frames for the graph panel
+  const frames = Gs.map((g,i)=>({
+    name:String(i),
+    data:[
+      {x:g.edgeX, y:g.edgeY},                                   // edges
+      {x:g.nodeX, y:g.nodeY, mode:'markers', marker:{size:6}}    // nodes
+    ]
+  }));
+
+  // initial traces
+  const graphData = [
+    {type:'scatter', mode:'lines',   x:Gs[0].edgeX, y:Gs[0].edgeY, line:{width:1}},
+    {type:'scatter', mode:'markers', x:Gs[0].nodeX, y:Gs[0].nodeY, marker:{size:6}}
+  ];
+  const graphLayout = {
+    title:'Graph at threshold τ',
+    xaxis:{visible:false}, yaxis:{visible:false, scaleanchor:'x'},
+    margin:{l:10,r:10,t:40,b:10},
+    sliders:[{pad:{t:25}, currentvalue:{prefix:'τ = '},
+      steps:T.map((t,i)=>({label:String(t),method:'animate',
+        args:[[String(i)],{mode:'immediate',frame:{duration:0,redraw:true}}]}))
+    }]
+  };
+
+  // EC panel
+  const ecData = [
+    {type:'scatter', mode:'lines+markers', x:T, y:EC, name:'EC(τ)'},
+    {type:'scatter', mode:'markers', x:[T[0]], y:[EC[0]], name:'current', marker:{size:10}}
+  ];
+  const ecFrames = T.map((t,i)=>({name:String(i), data:[null,{x:[t], y:[EC[i]]}]}));
+  const ecLayout = {title:'EC curve', xaxis:{title:'τ'}, yaxis:{title:'EC(τ)'},
+                    margin:{l:55,r:10,t:40,b:40}};
+
+  Plotly.newPlot('graph', graphData, graphLayout).then(()=>Plotly.addFrames('graph', frames));
+  Plotly.newPlot('ec',    ecData,    ecLayout   ).then(()=>Plotly.addFrames('ec',    ecFrames));
+});
+</script>
