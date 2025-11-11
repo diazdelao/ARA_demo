@@ -1,106 +1,55 @@
 <!doctype html><meta charset="utf-8">
-<title>EC Filtration</title>
+<title>Graph Filtration</title>
 <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
 
-<div id="heat"  style="width:33%;height:600px;display:inline-block"></div>
-<div id="graph"  style="width:33%;height:600px;display:inline-block"></div>
-<div id="ec"     style="width:33%;height:600px;display:inline-block"></div>
+<div id="graph" style="width:100%;height:620px"></div>
 
 <script>
-fetch("ec_payload.json").then(r=>r.json()).then(D=>{
-  const T   = D.thresholds;
-  const EC  = D.ec;
-  const Gs  = D.graphs;
-  const Z   = D.Z;                 // 2D array
-  const L   = D.xy_lim;            // xy limit (symmetric)
-  const zmin = Math.min(...Z.flat());
-  const zmax = Math.max(...Z.flat());
-  const ecMin = Math.min(...EC), ecMax = Math.max(...EC);
+fetch("ec_payload.json?v=4").then(r=>r.json()).then(D=>{
+  const T  = D.thresholds;
+  const Gs = D.graphs;
+  const fmt = t => (Math.abs(t) >= 1 ? t.toFixed(1) : t.toFixed(3));
 
-  // helper: threshold Z -> NaN below tau so heatmap masks itself
-  const maskZ = (Z, tau) => Z.map(row => row.map(v => (v >= tau ? v : NaN)));
-
-  // ---------- Frames for all three panels ----------
-  const frames = T.map((tau, i) => ({
+  // Frames: two traces per frame (edges, nodes)
+  const frames = Gs.map((g,i)=>({
     name: String(i),
-
-    // For Heatmap: one trace (z changes per frame)
-    // For Graph: two traces (edges, nodes)
-    // For EC: two traces (marker on curve, vertical line)
     data: [
-      // Heatmap (index 0)
-      { z: maskZ(Z, tau) },
-
-      // Graph edges (index 1)
-      { x: Gs[i].edgeX, y: Gs[i].edgeY },
-
-      // Graph nodes (index 2)
-      { x: Gs[i].nodeX, y: Gs[i].nodeY },
-
-      // EC moving marker (index 3)
-      { x: [tau], y: [EC[i]] },
-
-      // EC vertical line (index 4)
-      { x: [tau, tau], y: [ecMin, ecMax] }
+      { x: g.edgeX, y: g.edgeY },                          // edges
+      { x: g.nodeX, y: g.nodeY, marker: { size: 6 } }      // nodes
     ]
   }));
 
-  // ---------- HEATMAP ----------
-  const heatData = [{
-    type: 'heatmap',
-    z: maskZ(Z, T[0]),
-    zmin, zmax,
-    colorscale: 'Viridis',
-    colorbar: { title: 'Z' }
-  }];
-  const heatLayout = {
-    title: 'Heatmap',
-    margin:{l:50,r:10,t:40,b:40},
-    xaxis:{range:[-L, L], title:'x'},
-    yaxis:{range:[-L, L], title:'y', scaleanchor:'x'},
-  };
-
-  // ---------- GRAPH ----------
-  const graphData = [
-    {type:'scatter', mode:'lines',   x: Gs[0].edgeX, y: Gs[0].edgeY, line:{width:1}},
-    {type:'scatter', mode:'markers', x: Gs[0].nodeX, y: Gs[0].nodeY, marker:{size:6, color:'#ff7f0e'}}
+  // Initial traces
+  const data = [
+    { type:'scattergl', mode:'lines',   x:Gs[0].edgeX, y:Gs[0].edgeY, line:{width:1} },
+    { type:'scattergl', mode:'markers', x:Gs[0].nodeX, y:Gs[0].nodeY, marker:{size:6} }
   ];
-  const graphLayout = {
-    title:'Graph',
-    xaxis:{visible:false, range:[-L, L]},
-    yaxis:{visible:false, range:[-L, L], scaleanchor:'x'},
-    margin:{l:10,r:10,t:40,b:10},
+
+  // Layout with a single slider that drives frames
+  const layout = {
+    title: 'Graph at threshold τ',
+    xaxis: { visible:false },
+    yaxis: { visible:false, scaleanchor:'x' },
+    margin:{ l:10, r:10, t:40, b:10 },
     updatemenus:[{
       type:'buttons',
-      buttons:[{label:'Play', method:'animate',
-        args:[null,{fromcurrent:true, frame:{duration:0, redraw:true}, transition:{duration:0}}]}],
-      x:0.02, y:1.14
+      buttons:[{ label:'Play', method:'animate',
+        args:[null,{ fromcurrent:true, frame:{duration:0, redraw:true}, transition:{duration:0} }] }],
+      x:0.02, y:1.12
     }],
     sliders:[{
-      pad:{t:25}, currentvalue:{prefix:'\u03C4 = '},
-      steps: T.map((t,i)=>({label:String(t), method:'animate',
-        args:[[String(i)], {mode:'immediate', frame:{duration:0, redraw:true}}]}))
+      pad:{ t:20 },
+      currentvalue:{ prefix:'τ = ' },
+      steps: T.map((t,i)=>({
+        label: fmt(t),
+        method:'animate',
+        args:[[String(i)], { mode:'immediate', frame:{ duration:0, redraw:true }, transition:{ duration:0 } }]
+      }))
     }]
   };
 
-  // ---------- EC CURVE ----------
-  const ecData = [
-    {type:'scatter', mode:'lines+markers', x:T, y:EC, name:'EC(τ)'},
-    {type:'scatter', mode:'markers', x:[T[0]], y:[EC[0]], name:'current', marker:{size:10}},
-    {type:'scatter', mode:'lines', x:[T[0], T[0]], y:[ecMin, ecMax], name:'τ', line:{dash:'dot'}}
-  ];
-  const ecLayout = {
-    title:'EC Curve',
-    xaxis:{title:'\u03C4'},
-    yaxis:{title:'EC(\u03C4)'},
-    margin:{l:55,r:10,t:40,b:40},
-    showlegend:false
-  };
-
-  // ---------- Render + attach frames ----------
-  Plotly.newPlot('heat',  heatData,  heatLayout);
-  Plotly.newPlot('graph', graphData, graphLayout).then(()=>Plotly.addFrames('graph', frames));
-  Plotly.newPlot('ec',    ecData,    ecLayout   ).then(()=>Plotly.addFrames('ec',    frames));
-  // Note: we reuse the same 'frames' array for ec; its indices 3 and 4 update the marker and vline.
+  Plotly.newPlot('graph', data, layout).then(()=>{
+    Plotly.addFrames('graph', frames);
+  });
 });
 </script>
