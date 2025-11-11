@@ -5,17 +5,18 @@
 <div id="graph" style="width:100%;height:620px"></div>
 
 <script>
-fetch("ec_payload.json?v=4").then(r=>r.json()).then(D=>{
+fetch("ec_payload.json?v=7").then(r=>r.json()).then(D=>{
   const T  = D.thresholds;
   const Gs = D.graphs;
+  const L  = D.xy_lim;
   const fmt = t => (Math.abs(t) >= 1 ? t.toFixed(1) : t.toFixed(3));
 
-  // Frames: two traces per frame (edges, nodes)
+  // Frames: keep the SAME trace types as the initial plot
   const frames = Gs.map((g,i)=>({
     name: String(i),
     data: [
-      { x: g.edgeX, y: g.edgeY },                          // edges
-      { x: g.nodeX, y: g.nodeY, marker: { size: 6 } }      // nodes
+      { type:'scattergl', mode:'lines',   x:g.edgeX, y:g.edgeY, line:{width:1} },
+      { type:'scattergl', mode:'markers', x:g.nodeX, y:g.nodeY, marker:{size:6} }
     ]
   }));
 
@@ -25,11 +26,10 @@ fetch("ec_payload.json?v=4").then(r=>r.json()).then(D=>{
     { type:'scattergl', mode:'markers', x:Gs[0].nodeX, y:Gs[0].nodeY, marker:{size:6} }
   ];
 
-  // Layout with a single slider that drives frames
   const layout = {
     title: 'Graph at threshold τ',
-    xaxis: { visible:false },
-    yaxis: { visible:false, scaleanchor:'x' },
+    xaxis: { visible:false, range:[-L, L] },
+    yaxis: { visible:false, range:[-L, L], scaleanchor:'x' },
     margin:{ l:10, r:10, t:40, b:10 },
     updatemenus:[{
       type:'buttons',
@@ -48,8 +48,6 @@ fetch("ec_payload.json?v=4").then(r=>r.json()).then(D=>{
     }]
   };
 
-  Plotly.newPlot('graph', data, layout).then(()=>{
-    Plotly.addFrames('graph', frames);
-  });
+  Plotly.newPlot('graph', data, layout).then(()=> Plotly.addFrames('graph', frames));
 });
 </script>
